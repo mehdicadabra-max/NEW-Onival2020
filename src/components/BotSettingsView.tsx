@@ -34,11 +34,17 @@ import {
   Settings2,
   Server,
   BookOpen,
-  AlertTriangle
+  AlertTriangle,
+  CreditCard
 } from 'lucide-react';
 import { TelegramConfig, BotActivityLog, ContactMessage, Order, SiteContent } from '../types';
-import { apiFetch } from '../services/dataService';
-import { sendBaleAdminWelcomeTest, saveActiveBotConfig, TestAdminWelcomeResult, LOCAL_STORAGE_BOT_CONFIG_KEY } from '../services/baleService';
+import {
+  sendBaleAdminWelcomeTest,
+  sendBaleCustomerOrderTest,
+  saveActiveBotConfig,
+  TestAdminWelcomeResult,
+  LOCAL_STORAGE_BOT_CONFIG_KEY
+} from '../services/baleService';
 
 interface BotSettingsViewProps {
   config: TelegramConfig;
@@ -183,6 +189,10 @@ export const BotSettingsView: React.FC<BotSettingsViewProps> = ({
   const [welcomeTestResult, setWelcomeTestResult] = useState<TestAdminWelcomeResult | null>(null);
   const [isSendingWelcomeTest, setIsSendingWelcomeTest] = useState(false);
 
+  // Bale Customer Order Flow Test State
+  const [customerOrderTestResult, setCustomerOrderTestResult] = useState<{ ok: boolean; message: string; data?: any } | null>(null);
+  const [isSendingCustomerOrderTest, setIsSendingCustomerOrderTest] = useState(false);
+
   // Live Connection Tester States
   const [testingPlatform, setTestingPlatform] = useState<'bale' | 'telegram' | null>(null);
   const [baleDiagnostics, setBaleDiagnostics] = useState<any | null>(null);
@@ -206,6 +216,8 @@ export const BotSettingsView: React.FC<BotSettingsViewProps> = ({
   const [invoiceTestResult, setInvoiceTestResult] = useState<any | null>(null);
   const [isSimulatingBaleCycle, setIsSimulatingBaleCycle] = useState(false);
   const [baleCycleResult, setBaleCycleResult] = useState<any | null>(null);
+  const [selectedOrderCodeForTest, setSelectedOrderCodeForTest] = useState<string>('');
+  const [isSyncingUpdates, setIsSyncingUpdates] = useState<boolean>(false);
 
   // Quick Reply State for Support Desk
   const [replyingId, setReplyingId] = useState<number | null>(null);
@@ -331,6 +343,65 @@ export const BotSettingsView: React.FC<BotSettingsViewProps> = ({
       showToast(`خطا در ارسال پیام به ادمین: ${err?.message || 'خطای اتصال'}`, 'error');
     } finally {
       setIsSendingWelcomeTest(false);
+    }
+  };
+
+  // Dispatch customer order and payment request test to Bale
+  const handleSendCustomerOrderTest = async () => {
+    setIsSendingCustomerOrderTest(true);
+    setCustomerOrderTestResult(null);
+    try {
+      const tokenToUse = String(formData.botToken || formData.baleBotToken || '').trim();
+      const chatIdToUse = String(formData.adminChatId || formData.baleAdminChatId || '69451465').trim();
+      const botUserToUse = String(formData.botUsername || formData.baleBotUsername || 'Onivalbot').replace(/^@/, '').trim();
+
+      const syncedForm = {
+        ...formData,
+        botToken: tokenToUse,
+        baleBotToken: tokenToUse,
+        adminChatId: chatIdToUse,
+        baleAdminChatId: chatIdToUse,
+        botUsername: botUserToUse,
+        baleBotUsername: botUserToUse,
+      };
+
+      await saveActiveBotConfig(syncedForm);
+      setLastSavedAt(new Date().toLocaleTimeString('fa-IR'));
+      setHasUnsavedChanges(false);
+
+      const targetOrder = orders.find(o => o.trackingCode === selectedOrderCodeForTest) || orders[0];
+      const res = await sendBaleCustomerOrderTest({
+        chatId: chatIdToUse,
+        trackingCode: targetOrder?.trackingCode,
+        orderId: targetOrder?.id,
+      });
+
+      setCustomerOrderTestResult(res);
+      showToast(res.message, res.ok ? 'success' : 'error');
+      if (onRefreshData) await onRefreshData();
+    } catch (err: any) {
+      showToast(`خطا در تست ارسال فاکتور مشتری: ${err?.message || 'خطای اتصال'}`, 'error');
+    } finally {
+      setIsSendingCustomerOrderTest(false);
+    }
+  };
+
+  // Sync / check for any pending messages from Bale
+  const handleSyncBaleUpdates = async () => {
+    setIsSyncingUpdates(true);
+    try {
+      const res = await apiFetch('/api/bot/sync-updates', { method: 'POST' });
+      const data = await res.json().catch(() => null);
+      if (data?.ok) {
+        showToast(data.message || 'بررسی پیام‌ها با موفقیت انجام شد.', 'success');
+      } else {
+        showToast(data?.error || data?.message || 'خطا در استعلام پیام‌ها', 'error');
+      }
+      if (onRefreshData) await onRefreshData();
+    } catch (err: any) {
+      showToast(`خطا در اتصال به سرور: ${err?.message || 'خطای شبکه'}`, 'error');
+    } finally {
+      setIsSyncingUpdates(false);
     }
   };
 
@@ -1035,6 +1106,73 @@ export const BotSettingsView: React.FC<BotSettingsViewProps> = ({
                         </div>
                       );
                     })()}
+                  </div>
+
+                  {/* Real Customer Order & Payment Flow Tester */}
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50/70 to-indigo-50/50 border border-blue-200/70 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                          <CreditCard className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-black text-blue-950">تست واقعی ارسال مشخصات سفارش و فاکتور پرداخت مشتری</h4>
+                          <p className="text-[11px] text-slate-500">
+                            شبیه‌سازی کامل باز شدن ربات توسط مشتری و ارسال اقلام فاکتور، مبلغ کل و درخواست پرداخت
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleSendCustomerOrderTest}
+                        disabled={isSendingCustomerOrderTest}
+                        className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black shadow-md transition flex items-center justify-center gap-2 cursor-pointer"
+                        title="ارسال فاکتور و درخواست پرداخت مشتری به بله"
+                      >
+                        <Send className={`w-3.5 h-3.5 ${isSendingCustomerOrderTest ? 'animate-bounce' : ''}`} />
+                        <span>{isSendingCustomerOrderTest ? 'در حال ارسال فاکتور مشتری...' : 'تست ارسال فاکتور پرداخت مشتری'}</span>
+                      </button>
+                    </div>
+
+                    <div className="text-[11px] text-slate-600 bg-white/90 p-2.5 rounded-xl border border-blue-100 flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-blue-700 font-bold shrink-0">🔗 لینک هدایت مشتری به ربات:</span>
+                        <code className="font-mono text-xs text-blue-900 bg-blue-50 px-2 py-0.5 rounded border border-blue-200" dir="ltr">
+                          https://ble.ir/{(formData.baleBotUsername || formData.botUsername || 'Onivalbot').replace(/^@/, '')}?start=pay_{orders[0]?.trackingCode || 'ONV-ORD-101'}
+                        </code>
+                      </div>
+                      <a
+                        href={`https://ble.ir/${(formData.baleBotUsername || formData.botUsername || 'Onivalbot').replace(/^@/, '')}?start=pay_${orders[0]?.trackingCode || 'ONV-ORD-101'}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[11px] font-bold text-blue-700 hover:text-blue-900 inline-flex items-center gap-1"
+                      >
+                        <span>تست مستقیم در بله</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+
+                    {customerOrderTestResult && (
+                      <div className={`p-3.5 rounded-2xl border text-xs space-y-1.5 ${
+                        customerOrderTestResult.ok ? 'bg-emerald-50 border-emerald-300 text-emerald-950' : 'bg-rose-50 border-rose-300 text-rose-950'
+                      }`}>
+                        <div className="flex items-center justify-between font-bold">
+                          <span className="flex items-center gap-1.5">
+                            {customerOrderTestResult.ok ? (
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                            ) : (
+                              <AlertCircle className="w-4 h-4 text-rose-600" />
+                            )}
+                            <span>{customerOrderTestResult.message}</span>
+                          </span>
+                        </div>
+                        {customerOrderTestResult.ok && (
+                          <p className="text-[11px] text-emerald-800">
+                            فاکتور سفارش، صورتحساب اقلام، مبلغ قابل پرداخت، دکمه‌های پرداخت با کیف پول بله و شماره کارت به چت شما ارسال شد. لطفاً اپلیکیشن بله خود را بررسی فرمایید.
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Quick Diagnostics Result Box */}

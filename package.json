@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx server.ts",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs && node scripts/generate-htaccess.js",
-    "start": "node dist/server.cjs"
+    "start": "node server.ts",
+    "lint": "tsc --noEmit"
   },
   "dependencies": {
     "clsx": "^2.1.1",

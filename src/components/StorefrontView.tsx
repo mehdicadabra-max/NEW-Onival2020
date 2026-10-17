@@ -46,7 +46,8 @@ import {
   Film,
   Images,
   ChevronLeft,
-  ShieldCheck
+  ShieldCheck,
+  FileText
 } from 'lucide-react';
 import { Product, ProductCategory, Post, ContactMessage, Order, OrderItem, ProductSize, SiteContent, PaymentConfig, TelegramConfig } from '../types';
 import { apiFetch, setAdminSessionToken, getCachedLocalState } from '../services/dataService';

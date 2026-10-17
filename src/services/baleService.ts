@@ -285,3 +285,28 @@ export async function sendBaleAdminOrderNotification(order: Order, customConfig?
     // ignore client network failure
   }
 }
+
+/**
+ * Dispatches test customer invoice & payment options to the test chat on Bale.
+ */
+export async function sendBaleCustomerOrderTest(options?: {
+  chatId?: string;
+  trackingCode?: string;
+  orderId?: number;
+}): Promise<{ ok: boolean; message: string; data?: any }> {
+  try {
+    const res = await apiFetch('/api/bot/test-customer-order-flow', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(options || {})
+    });
+    const data = await res.json().catch(() => null);
+    if (res.ok && data?.ok) {
+      return { ok: true, message: data.message || 'مشخصات سفارش و فاکتور پرداخت به بله ارسال شد.', data };
+    }
+    return { ok: false, message: data?.message || data?.error || 'خطا در ارسال فاکتور پرداخت به بله.' };
+  } catch (err: any) {
+    return { ok: false, message: `خطا در ارتباط با سرور: ${err?.message || 'خطای شبکه'}` };
+  }
+}
+

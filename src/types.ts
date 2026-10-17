@@ -52,6 +52,8 @@ export interface Product {
   updatedAt?: string;
   status?: PublicationStatus;
   availability?: StockAvailability;
+  isOutOfStock?: boolean;
+  stock?: number;
   sku?: string;
   seoTitle?: string;
   seoDescription?: string;
@@ -430,7 +432,7 @@ export interface SiteContent {
   contactPhone: string;
   contactAddress: string;
   contactWorkingHours: string;
-  contactEmail: string;
+  contactEmail?: string;
   footerCopyright: string;
   footerFootnote?: string;
   enamadCode?: string;

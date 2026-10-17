@@ -598,6 +598,7 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
   contactPhone: '۰۲۱-۱۲۳۴۵۶۷۸ / ۰۹۱۲۳۴۵۶۷۸۹',
   contactAddress: 'تهران، مجموعه تخصصی فرآورده‌های ارگانیک اونیوال (ONIVAL)',
   contactWorkingHours: 'شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰ | پنج‌شنبه‌ها ۹:۰۰ الی ۱۳:۰۰',
+  contactEmail: 'info@onival.ir',
   footerCopyright: 'تمامی حقوق مادی و معنوی متعلق به فروشگاه اونیوال (ONIVAL) می‌باشد.',
   footerFootnote: 'فروشگاه تخصصی فرآورده‌های ارگانیک کوهستان و کندو • تضمین برگه آزمایشگاهی و اصالت ۱۰۰٪ تمامی محصولات • ارسال سریع به سراسر کشور با بسته‌بندی ایمن',
   enamadStatus: 'placeholder',
